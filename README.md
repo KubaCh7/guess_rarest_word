@@ -4,6 +4,10 @@ Polska gra słowna w stylu Krillion. Dostajesz kategorię (np. „Owoc”, „Co
 albo zadanie literowe (np. „Słowo na PR”) i masz 25 sekund na odpowiedź.
 Im rzadsze słowo, tym więcej punktów, a każdy punkt to 10 metrów głębiej pod wodą.
 
+Ponad 5,7 tys. pytań: 171 kategorii (ponad 37 tys. odpowiedzi), ich warianty
+z literą („Owoc na literę P”, „Ssak z końcówką -N”, „Ser, co najmniej 10 liter”)
+oraz zadania literowe na słowniku prawie 200 tys. słów.
+
 ## Tryby
 
 - **Nurkowanie dnia**: 7 pytań, takich samych przez cały dzień, liczy się seria dni.

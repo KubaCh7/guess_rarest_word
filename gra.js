@@ -91,12 +91,53 @@
     return { id: "k" + i, typ: "kategoria", q: k.q, paczka: k.p, odp, indeks };
   });
 
+  // Kategoria + litera ("Owoc na literę P"): tysiące dodatkowych pytań z tych samych list.
+  const MIN_ODP_KOMBINACJI = 6;
+  const KOMBINACJE = [];
+  for (const kat of KATEGORIE) {
+    const nazwa = kat.q.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const poczatki = new Map(), konce = new Map();
+    const dodaj = (m, l, o) => { if (!m.has(l)) m.set(l, []); m.get(l).push(o); };
+    for (const o of kat.odp) {
+      const litery = maleLitery(o.pokaz);
+      if (!litery) continue;
+      dodaj(poczatki, litery[0], o);
+      dodaj(konce, litery[litery.length - 1], o);
+    }
+    const utworz = (odp, dane) => {
+      if (odp.length < MIN_ODP_KOMBINACJI) return;
+      const indeks = new Map();
+      for (const o of odp) for (const f of o.formy) if (!indeks.has(f)) indeks.set(f, o);
+      KOMBINACJE.push({ typ: "kategoria", baza: kat.q, paczka: kat.paczka, odp, indeks, ...dane });
+    };
+    for (const [l, odp] of poczatki) utworz(odp, {
+      id: kat.id + ":" + l, litera: l,
+      q: `${kat.q} na literę ${l.toUpperCase()}`,
+      html: `${nazwa} na literę <span class="lit">${l.toUpperCase()}</span>`,
+    });
+    for (const n of [8, 10, 12]) utworz(kat.odp.filter((o) => maleLitery(o.pokaz).length >= n), {
+      id: kat.id + ":d" + n, minDlugosc: n,
+      q: `${kat.q}, co najmniej ${n} liter`,
+      html: `${nazwa}, <span class="lit">co najmniej ${n} liter</span>`,
+    });
+    for (const [l, odp] of konce) utworz(odp, {
+      id: kat.id + ":-" + l, koniec: l,
+      q: `${kat.q} z końcówką -${l.toUpperCase()}`,
+      html: `${nazwa} z końcówką <span class="lit">-${l.toUpperCase()}</span>`,
+    });
+  }
+
+  function pasujeLitera(z, wpis) {
+    const l = maleLitery(wpis);
+    return (!z.litera || l.startsWith(z.litera)) && (!z.koniec || l.endsWith(z.koniec)) && (!z.minDlugosc || l.length >= z.minDlugosc);
+  }
+
   function znajdzWKategorii(kat, wpis) {
     const n = norm(wpis);
     if (!n) return null;
     if (kat.indeks.has(n)) return kat.indeks.get(n);
-    const wlasne = (pamiec.wlasne[kat.q] || []);
-    if (wlasne.includes(n)) return { pokaz: wpis.trim(), pkt: PUNKTY_WLASNE, wlasne: true };
+    const wlasne = (pamiec.wlasne[kat.baza || kat.q] || []);
+    if (wlasne.includes(n) && pasujeLitera(kat, wpis)) return { pokaz: wpis.trim(), pkt: PUNKTY_WLASNE, wlasne: true };
     let najlepsze = null, wynik = 9;
     const lim = tolerancja(n.length);
     const r = rdzen(n);
@@ -157,12 +198,27 @@
     const wybierz = (m, prog) => [...m.entries()].filter(([, c]) => c >= prog).map(([k]) => k).sort();
     const lista = [];
     const duze = (t) => t.toUpperCase();
-    for (const p of wybierz(pre2, 500)) lista.push({ klucz: "p:" + p, html: `Słowo na <span class="lit">${duze(p)}</span>`, opis: `zaczyna się na „${p}”`, test: (w) => w.startsWith(p) });
-    for (const p of wybierz(pre3, 300)) lista.push({ klucz: "p:" + p, html: `Słowo na <span class="lit">${duze(p)}</span>`, opis: `zaczyna się na „${p}”`, test: (w) => w.startsWith(p) });
-    for (const s of wybierz(suf3, 400)) lista.push({ klucz: "s:" + s, html: `Słowo kończące się na <span class="lit">-${duze(s)}</span>`, opis: `kończy się na „${s}”`, test: (w) => w.endsWith(s) });
-    for (const s of wybierz(suf4, 250)) lista.push({ klucz: "s:" + s, html: `Słowo kończące się na <span class="lit">-${duze(s)}</span>`, opis: `kończy się na „${s}”`, test: (w) => w.endsWith(s) });
-    for (const m of wybierz(mid3, 1500)) lista.push({ klucz: "m:" + m, html: `Słowo z <span class="lit">${duze(m)}</span> w środku`, opis: `ma „${m}” w środku (nie na początku ani na końcu)`, test: (w) => w.indexOf(m, 1) > 0 && w.indexOf(m, 1) + 3 < w.length });
-    for (const l of wybierz(dlugie, 500)) lista.push({ klucz: "d:" + l, html: `Słowo na <span class="lit">${duze(l)}</span>, minimum 11 liter`, opis: `zaczyna się na „${l}” i ma co najmniej 11 liter`, test: (w) => w.startsWith(l) && w.length >= 11 });
+    for (const p of wybierz(pre2, 300)) lista.push({ klucz: "p:" + p, html: `Słowo na <span class="lit">${duze(p)}</span>`, opis: `zaczyna się na „${p}”`, test: (w) => w.startsWith(p) });
+    for (const p of wybierz(pre3, 150)) lista.push({ klucz: "p:" + p, html: `Słowo na <span class="lit">${duze(p)}</span>`, opis: `zaczyna się na „${p}”`, test: (w) => w.startsWith(p) });
+    for (const s of wybierz(suf3, 200)) lista.push({ klucz: "s:" + s, html: `Słowo kończące się na <span class="lit">-${duze(s)}</span>`, opis: `kończy się na „${s}”`, test: (w) => w.endsWith(s) });
+    for (const s of wybierz(suf4, 120)) lista.push({ klucz: "s:" + s, html: `Słowo kończące się na <span class="lit">-${duze(s)}</span>`, opis: `kończy się na „${s}”`, test: (w) => w.endsWith(s) });
+    for (const m of wybierz(mid3, 800)) lista.push({ klucz: "m:" + m, html: `Słowo z <span class="lit">${duze(m)}</span> w środku`, opis: `ma „${m}” w środku (nie na początku ani na końcu)`, test: (w) => w.indexOf(m, 1) > 0 && w.indexOf(m, 1) + 3 < w.length });
+    const dokladnie = new Map(), poczKon = new Map();
+    const KONCOWKI_ZADAN = ["a", "ć", "ść", "ek", "ka", "nik", "owy", "anie", "enie", "ny", "ik", "ia"];
+    for (const w of SLOWNIK.slowa) {
+      if (w.length < MIN_DLUGOSC_LITERY) continue;
+      if (w.length >= 5 && w.length <= 10) inc(dokladnie, w[0] + w.length);
+      for (const k of KONCOWKI_ZADAN) if (w.endsWith(k) && w.length > k.length + 1) inc(poczKon, w[0] + "|" + k);
+    }
+    for (const k of wybierz(dokladnie, 150)) {
+      const l = k[0], n = Number(k.slice(1));
+      lista.push({ klucz: "dl:" + k, html: `Słowo na <span class="lit">${duze(l)}</span>, dokładnie ${n} liter`, opis: `zaczyna się na „${l}” i ma dokładnie ${n} liter`, test: (w) => w.startsWith(l) && w.length === n });
+    }
+    for (const k of wybierz(poczKon, 80)) {
+      const [l, kon] = k.split("|");
+      lista.push({ klucz: "pk:" + k, html: `Słowo na <span class="lit">${duze(l)}</span> kończące się na <span class="lit">-${duze(kon)}</span>`, opis: `zaczyna się na „${l}” i kończy na „${kon}”`, test: (w) => w.startsWith(l) && w.endsWith(kon) && w.length > kon.length + 1 });
+    }
+    for (const l of wybierz(dlugie, 250)) lista.push({ klucz: "d:" + l, html: `Słowo na <span class="lit">${duze(l)}</span>, minimum 11 liter`, opis: `zaczyna się na „${l}” i ma co najmniej 11 liter`, test: (w) => w.startsWith(l) && w.length >= 11 });
     const specjalne = [
       ["x:zz", "Słowo z <span class=\"lit\">Ż</span> i <span class=\"lit\">Ó</span>", "ma literę „ż” i „ó”", (w) => w.includes("ż") && w.includes("ó")],
       ["x:ae", "Słowo z <span class=\"lit\">Ą</span> i <span class=\"lit\">Ę</span>", "ma literę „ą” i „ę”", (w) => w.includes("ą") && w.includes("ę")],
@@ -240,7 +296,7 @@
   function zestawDnia(data) {
     const rng = mulberry32(Number(data.replace(/-/g, "")) * 2654435761 % 4294967296);
     const paczki = tasuj(rng, [...new Set(KATEGORIE.map((k) => k.paczka))]);
-    const kat = paczki.slice(0, 5).map((p) => losuj(rng, KATEGORIE.filter((k) => k.paczka === p)));
+    const kat = paczki.slice(0, 5).map((p, i) => losuj(rng, (i < 3 ? KATEGORIE : KOMBINACJE).filter((k) => k.paczka === p)));
     const lit = losujLiterowe(rng, 2);
     const wynik = tasuj(rng, kat.concat(lit));
     return wynik;
@@ -248,16 +304,21 @@
   function zestawPaczki(paczka) {
     const rng = Math.random;
     if (paczka === "litery") return losujLiterowe(rng, RUND_W_NURKOWANIU);
-    const pula = tasuj(rng, KATEGORIE.filter((k) => k.paczka === paczka));
-    const out = pula.slice(0, RUND_W_NURKOWANIU);
-    while (out.length < RUND_W_NURKOWANIU) out.push(losuj(rng, pula));
+    const zwykle = tasuj(rng, KATEGORIE.filter((k) => k.paczka === paczka));
+    const zLitera = tasuj(rng, KOMBINACJE.filter((k) => k.paczka === paczka));
+    const out = [];
+    while (out.length < RUND_W_NURKOWANIU) {
+      const zrodlo = rng() < 0.55 && zwykle.length ? zwykle : zLitera.length ? zLitera : zwykle;
+      out.push(zrodlo.pop() || losuj(rng, KATEGORIE.filter((k) => k.paczka === paczka)));
+    }
     return out;
   }
   let ostatnieBezKonca = [];
   function nastepneBezKonca() {
     let z;
     for (let i = 0; i < 20; i++) {
-      z = Math.random() < 0.72 ? losuj(Math.random, KATEGORIE) : losujLiterowe(Math.random, 1)[0];
+      const r = Math.random();
+      z = r < 0.45 ? losuj(Math.random, KATEGORIE) : r < 0.75 ? losuj(Math.random, KOMBINACJE) : losujLiterowe(Math.random, 1)[0];
       if (!ostatnieBezKonca.includes(z.q)) break;
     }
     ostatnieBezKonca = [z.q, ...ostatnieBezKonca].slice(0, 25);
@@ -476,7 +537,7 @@
 
   function runda() {
     const z = biezace();
-    const pytanieHtml = z.typ === "kategoria" ? esc(z.q) : z.html;
+    const pytanieHtml = z.html || esc(z.q);
     const podp = z.typ === "kategoria"
       ? "Podaj coś z tej kategorii. Im rzadsza odpowiedź, tym głębiej zanurkujesz."
       : "Dowolne polskie słowo w formie podstawowej. Rzadkie słowa dają najwięcej punktów.";
@@ -541,8 +602,14 @@
   }
 
   function uznajWlasne(z, wpis) {
-    const klucz = z.typ === "kategoria" ? z.q : "litery";
+    const klucz = z.typ === "kategoria" ? (z.baza || z.q) : "litery";
     const n = norm(wpis);
+    if (!pasujeLitera(z, wpis)) {
+      const kom = el("komunikat");
+      kom.className = "komunikat zly";
+      kom.textContent = z.litera ? `„${wpis}” nie zaczyna się na literę ${z.litera.toUpperCase()}.` : z.koniec ? `„${wpis}” nie kończy się na literę ${z.koniec.toUpperCase()}.` : `„${wpis}” ma mniej niż ${z.minDlugosc} liter.`;
+      return;
+    }
     if (z.typ === "litery" && !z.test(maleLitery(wpis))) {
       const kom = el("komunikat");
       kom.className = "komunikat zly";
@@ -606,7 +673,7 @@
     ekran.innerHTML = `
       <section class="panel wynik wejscie" aria-live="polite">
         ${naglowekRundy()}
-        <p class="podpowiedz">${z.typ === "kategoria" ? esc(z.q) : z.html}</p>
+        <p class="podpowiedz">${z.html || esc(z.q)}</p>
         ${glowna}
         <p class="lista"><b>Najczęstsze odpowiedzi:</b> ${u.najczestsze.map(esc).join(", ")}</p>
         <p class="lista"><b>Rzadkie perełki:</b> ${u.perelki.map(esc).join(", ") || "brak"}</p>
@@ -688,6 +755,7 @@
     const dzis = pamiec.dni[d];
     const seria = pamiec.ostatniDzien === d || pamiec.ostatniDzien === wczoraj() ? pamiec.seria : 0;
     const liczbaOdp = KATEGORIE.reduce((s, k) => s + k.odp.length, 0);
+    const liczbaPytan = KATEGORIE.length + KOMBINACJE.length + zbudujZadaniaLiterowe().length;
     const paczki = [...new Set(KATEGORIE.map((k) => k.paczka))];
     ekran.innerHTML = `
       <section class="bohater">
@@ -722,7 +790,7 @@
           <div class="stat"><b>${Object.keys(pamiec.odkryte).length.toLocaleString("pl-PL")}</b><span>Odkryte słowa</span></div>
         </div>
       </section>
-      <p class="stopka">${KATEGORIE.length} kategorii · <b>${liczbaOdp.toLocaleString("pl-PL")}</b> odpowiedzi · <b>${SLOWNIK.slowa.length.toLocaleString("pl-PL")}</b> słów w słowniku · <button class="linkowy" type="button" id="zasady">Jak grać</button></p>`;
+      <p class="stopka"><b>${liczbaPytan.toLocaleString("pl-PL")}</b> pytań · ${KATEGORIE.length} kategorii · <b>${liczbaOdp.toLocaleString("pl-PL")}</b> odpowiedzi · <b>${SLOWNIK.slowa.length.toLocaleString("pl-PL")}</b> słów w słowniku · <button class="linkowy" type="button" id="zasady">Jak grać</button></p>`;
     el("trybDzien").addEventListener("click", () => {
       if (pamiec.dni[d]) return pokazDzien(d);
       nowaGra("dzien", zestawDnia(d));
