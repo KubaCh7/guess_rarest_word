@@ -283,7 +283,7 @@
   const el = (id) => document.getElementById(id);
   const ekran = el("ekran");
   const KOLORY_TLA = [
-    [0, "#1d6f9a", "#0e3f63"], [600, "#145a85", "#0a3253"], [1500, "#0c3a62", "#061f3b"],
+    [0, "#2a86b4", "#0e3f63"], [600, "#145a85", "#0a3253"], [1500, "#0c3a62", "#061f3b"],
     [4000, "#082647", "#03122a"], [7000, "#05162e", "#020a19"], [11000, "#030b1c", "#01040c"],
   ];
   function mieszaj(a, b, t) {
@@ -302,6 +302,7 @@
     const t = Math.max(0, Math.min(1, (m - m0) / (m1 - m0)));
     document.documentElement.style.setProperty("--bg-top", mieszaj(g0, g1, t));
     document.documentElement.style.setProperty("--bg-bottom", mieszaj(d0, d1, t));
+    document.documentElement.style.setProperty("--swiatlo", Math.max(0, 1 - m / 900).toFixed(3));
     snieg.glebia = Math.min(1, m / 8000);
   }
   for (const z of ZNACZNIKI) {
@@ -312,7 +313,7 @@
   }
 
   // Morski śnieg: drobinki unoszące się w toni (w górę = schodzimy w dół).
-  const snieg = { glebia: 0 };
+  const snieg = { glebia: 0, zryw: 0 };
   (function animujSnieg() {
     const c = el("snieg"), ctx = c.getContext("2d");
     const ruch = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -327,7 +328,7 @@
     function klatka(t) {
       ctx.clearRect(0, 0, innerWidth, innerHeight);
       for (const p of czastki) {
-        if (ruch) { p.y -= p.v * (1 + snieg.glebia); p.x += Math.sin(t / 2400 + p.f) * 0.08; if (p.y < -4) { p.y = innerHeight + 4; p.x = Math.random() * innerWidth; } }
+        if (ruch) { p.y -= p.v * (1 + snieg.glebia + snieg.zryw * 14); p.x += Math.sin(t / 2400 + p.f) * 0.08; if (p.y < -4) { p.y = innerHeight + 4; p.x = Math.random() * innerWidth; } }
         const swiat = snieg.glebia > 0.35 && p.r > 1.5;
         ctx.fillStyle = swiat ? `rgba(134, 230, 255, ${0.35 + 0.35 * Math.sin(t / 900 + p.f)})` : `rgba(220, 240, 255, ${0.18 + p.r * 0.12})`;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
@@ -338,6 +339,112 @@
     rozmiar();
     requestAnimationFrame(klatka);
   })();
+
+  // ---------- Animacja nurkowania ----------
+  const BEZ_RUCHU = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const ladneKroki = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+  const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  // Kryl opada w toń: miarka głębokości przesuwa się w górę, licznik metrów rośnie,
+  // woda ciemnieje, a z nurka lecą bąbelki. Kliknięcie lub klawisz kończy od razu.
+  function animujNurkowanie(od, doM, pkt, poziom, wlasne) {
+    if (BEZ_RUCHU || doM <= od) return Promise.resolve();
+    const warstwa = el("nurkowanie"), linijka = el("linijka"), nurek = el("nurek");
+    const licznikM = el("licznikM"), licznikStrefa = el("licznikStrefa"), pod = el("licznikPod");
+    const roznica = doM - od;
+    const czas = 1500 + Math.min(1700, roznica * 1.6);
+    const skala = Math.max(0.35, Math.min(4, 900 / roznica));
+    const krok = ladneKroki.find((k) => k * skala >= 70) || 5000;
+    const srodek = innerHeight * 0.42;
+
+    linijka.innerHTML = "";
+    const kreski = [];
+    const pocz = Math.floor((od - srodek / skala) / krok) * krok;
+    const kon = doM + (innerHeight - srodek) / skala + krok;
+    for (let m = Math.max(0, pocz); m <= kon; m += krok / 2) {
+      const duza = m % krok === 0;
+      const k = document.createElement("div");
+      k.className = "kreska" + (duza ? "" : " mala");
+      if (duza) k.innerHTML = `<span>${fmtM(m)}</span>`;
+      linijka.appendChild(k);
+      kreski.push([k, m]);
+    }
+    for (const z of ZNACZNIKI) {
+      if (z < pocz || z > kon) continue;
+      const k = document.createElement("div");
+      k.className = "kreska strefa";
+      k.innerHTML = `<span>${strefa(z).nazwa}</span>`;
+      linijka.appendChild(k);
+      kreski.push([k, z]);
+    }
+    const P = POZIOMY[poziom];
+    pod.className = "pod";
+    pod.innerHTML = `<b>+${pkt} pkt</b><span class="chip ${P.kl}">${P.nazwa}</span>`;
+
+    warstwa.hidden = false;
+    warstwa.removeAttribute("aria-hidden");
+    requestAnimationFrame(() => warstwa.classList.add("widoczne"));
+
+    return new Promise((gotowe) => {
+      let start = null, koniec = false, ostatniBabel = 0;
+      const zakoncz = () => {
+        if (koniec) return;
+        koniec = true;
+        removeEventListener("keydown", klawisz);
+        rysuj(doM, 1, performance.now());
+        pod.classList.add("widoczne");
+        snieg.zryw = 0;
+        setTimeout(() => {
+          warstwa.classList.remove("widoczne");
+          setTimeout(() => { warstwa.hidden = true; warstwa.setAttribute("aria-hidden", "true"); gotowe(); }, 350);
+        }, 650);
+      };
+      const pomin = () => { start = -1e9; };
+      warstwa.onclick = pomin;
+      // Enter, którym wysłano odpowiedź, nie może od razu pominąć animacji.
+      const odKiedy = performance.now() + 300;
+      const klawisz = (e) => {
+        if (performance.now() < odKiedy || e.repeat) return;
+        if (e.key === "Enter" || e.key === " " || e.key === "Escape") { e.preventDefault(); pomin(); }
+      };
+      addEventListener("keydown", klawisz);
+
+      function rysuj(m, t, now) {
+        licznikM.textContent = "▼ " + fmtM(Math.round(m));
+        licznikStrefa.textContent = strefa(m).nazwa;
+        for (const [k, km] of kreski) k.style.transform = `translateY(${srodek + (km - m) * skala}px)`;
+        const predkosc = Math.sin(Math.PI * t);
+        const kolys = Math.sin(now / 260) * 4;
+        nurek.style.transform = `translateY(${kolys + predkosc * 18}px) rotate(${18 + predkosc * 52}deg)`;
+        snieg.zryw = predkosc;
+        ustawGlebokosc(Math.round(m));
+      }
+      function babel(now) {
+        if (now - ostatniBabel < 110) return;
+        ostatniBabel = now;
+        const b = document.createElement("div");
+        const r = 6 + Math.random() * 14;
+        const box = nurek.getBoundingClientRect();
+        b.className = "babel";
+        b.style.width = b.style.height = r + "px";
+        b.style.left = box.left + box.width * (0.35 + Math.random() * 0.3) + "px";
+        b.style.top = box.top + box.height * 0.3 + "px";
+        b.style.setProperty("--dx", (Math.random() * 60 - 30) + "px");
+        warstwa.appendChild(b);
+        setTimeout(() => b.remove(), 1700);
+      }
+      function klatka(now) {
+        if (start === null) start = now;
+        const t = Math.min(1, (now - start) / czas);
+        if (koniec) return;
+        rysuj(od + roznica * easeInOut(t), t, now);
+        if (t < 0.92) babel(now);
+        if (t >= 1) return zakoncz();
+        requestAnimationFrame(klatka);
+      }
+      requestAnimationFrame(klatka);
+    });
+  }
 
   // ---------- Stan gry ----------
   let gra = null;
@@ -465,11 +572,14 @@
     return { najczestsze, perelki, ile: pas.length };
   }
 
-  function zakonczRunde(odp, czas = false) {
+  async function zakonczRunde(odp, czas = false) {
     zatrzymajZegar();
+    if (gra.konczy) return;
+    gra.konczy = true;
     const z = biezace();
     const pkt = odp ? odp.pkt : 0;
     const poziom = poziomZPunktow(pkt, odp && odp.wlasne);
+    const przed = gra.glebia;
     gra.glebia += pkt * METRY_ZA_PUNKT;
     gra.wyniki.push({ q: z.q, slowo: odp ? odp.pokaz : null, pkt, poziom });
     if (odp) {
@@ -477,6 +587,10 @@
       zapisz();
     }
     if (gra.tryb === "bezkonca" && !odp) gra.butle -= 1;
+    const input = el("odpowiedz");
+    if (input) input.blur();
+    await animujNurkowanie(przed, gra.glebia, pkt, poziom, odp && odp.wlasne);
+    gra.konczy = false;
     ustawGlebokosc(gra.glebia);
     const u = ujawnienie(z, odp);
     const ostatnia = gra.tryb === "bezkonca" ? gra.butle <= 0 : gra.idx + 1 >= gra.zadania.length;
@@ -490,7 +604,7 @@
          <h2 class="slowo">0 pkt</h2>
          <div class="popularnosc">${gra.tryb === "bezkonca" ? `Tracisz butlę tlenu. Zostało: ${gra.butle}.` : "Tym razem bez zanurzenia."}</div>`;
     ekran.innerHTML = `
-      <section class="panel wynik" aria-live="polite">
+      <section class="panel wynik wejscie" aria-live="polite">
         ${naglowekRundy()}
         <p class="podpowiedz">${z.typ === "kategoria" ? esc(z.q) : z.html}</p>
         ${glowna}

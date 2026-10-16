@@ -12,30 +12,35 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Manrope:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Układ: jedna kolumna jak sonda opadająca w toń; tło ciemnieje z głębokością nurkowania. */
+/* Układ: jedna kolumna szklanych tafli unoszących się w toni; tło ciemnieje z głębokością. */
 :root {
   color-scheme: dark;
-  --bg-top: #1d6f9a;
+  --bg-top: #2a86b4;
   --bg-bottom: #0e3f63;
-  --ink: #eaf5ff;
-  --ink-dim: #a3bfd6;
-  --ink-faint: #6f8ea8;
+  --swiatlo: 1;
+  --ink: #f2f9ff;
+  --ink-dim: #c2d8ea;
+  --ink-faint: #8fb0c9;
   --krill: #ff8f7e;
-  --krill-deep: #e2604f;
-  --glow: #86e6ff;
-  --panel: rgba(3, 18, 36, 0.58);
-  --panel-solid: #08223b;
-  --line: rgba(163, 191, 214, 0.2);
-  --t1: #8fd3ff;
-  --t2: #6fe0b6;
-  --t3: #b99cff;
-  --t4: #ff8f7e;
-  --t5: #ffd36b;
-  --bad: #ff6b81;
+  --krill-hi: #ffb3a6;
+  --glow: #8fe9ff;
+  --szklo: rgba(255, 255, 255, 0.10);
+  --szklo-mocne: rgba(255, 255, 255, 0.16);
+  --szklo-brzeg: rgba(255, 255, 255, 0.26);
+  --szklo-blask: rgba(255, 255, 255, 0.55);
+  --cien: rgba(0, 12, 32, 0.32);
+  --line: rgba(255, 255, 255, 0.14);
+  --t1: #9fdcff;
+  --t2: #7ff0c4;
+  --t3: #c8b0ff;
+  --t4: #ff9c8c;
+  --t5: #ffd97a;
+  --bad: #ff8fa0;
   --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
   --f-body: "Manrope", "Segoe UI", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --r: 14px;
+  --r: 28px;
+  --r-s: 20px;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -48,10 +53,29 @@ body {
   background: var(--bg-bottom);
   background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
   background-attachment: fixed;
-  transition: background-color 1.2s ease;
   -webkit-font-smoothing: antialiased;
 }
-#snieg { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+
+/* Tło: promienie światła, poświaty i morski śnieg. Dają szkłu co rozmywać. */
+.tlo { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.promienie {
+  position: absolute; inset: -20% -30% 30% -30%;
+  background: repeating-linear-gradient(100deg, rgba(255,255,255,0) 0 60px, rgba(255,255,255,0.09) 60px 90px, rgba(255,255,255,0) 90px 170px, rgba(255,255,255,0.05) 170px 200px, rgba(255,255,255,0) 200px 260px);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+  opacity: var(--swiatlo);
+  transform-origin: 50% 0;
+  animation: kolys 14s ease-in-out infinite alternate;
+  transition: opacity 1s ease;
+}
+@keyframes kolys { from { transform: skewX(-6deg) translateX(-2%); } to { transform: skewX(6deg) translateX(2%); } }
+.poswiata { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.55; animation: dryf 22s ease-in-out infinite alternate; }
+.poswiata.a { width: 46vmax; height: 46vmax; left: -12vmax; top: 8vh; background: radial-gradient(circle, rgba(120, 220, 255, 0.55), transparent 65%); }
+.poswiata.b { width: 38vmax; height: 38vmax; right: -10vmax; top: 45vh; background: radial-gradient(circle, rgba(255, 143, 126, 0.32), transparent 65%); animation-duration: 28s; }
+.poswiata.c { width: 30vmax; height: 30vmax; left: 30vw; bottom: -12vmax; background: radial-gradient(circle, rgba(150, 120, 255, 0.28), transparent 65%); animation-duration: 34s; }
+@keyframes dryf { from { transform: translate(0, 0) scale(1); } to { transform: translate(6vw, -5vh) scale(1.12); } }
+#snieg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
 .aplikacja {
   position: relative; z-index: 1;
   max-width: 680px; margin: 0 auto; min-height: 100%;
@@ -63,55 +87,68 @@ body {
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; }
 
-/* Pasek górny: logo i sonda głębokości */
-.gora { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* Szkło: półprzezroczysta tafla, rozmycie, jasna krawędź u góry i miękki odblask. */
+.szklo, .panel, .tryb, .paczka, .gora, .przycisk.drugi, form.wpis input, .licznik {
+  position: relative; isolation: isolate;
+  background: linear-gradient(155deg, var(--szklo-mocne) 0%, var(--szklo) 45%, rgba(255,255,255,0.06) 100%);
+  border: 1px solid var(--szklo-brzeg);
+  -webkit-backdrop-filter: blur(22px) saturate(175%);
+  backdrop-filter: blur(22px) saturate(175%);
+  box-shadow:
+    inset 0 1px 0 var(--szklo-blask),
+    inset 0 -1px 0 rgba(255,255,255,0.08),
+    inset 0 0 28px rgba(255,255,255,0.05),
+    0 14px 40px var(--cien);
+}
+.panel::before, .tryb::before, .gora::before, .licznik::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 70% at 12% -20%, rgba(255,255,255,0.22), transparent 55%);
+}
+
+/* Pasek górny */
+.gora { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 999px; }
 .logo {
-  font-family: var(--f-display); font-weight: 800; font-size: 18px; letter-spacing: 0.02em;
+  font-family: var(--f-display); font-weight: 800; font-size: 17px; letter-spacing: 0.02em;
   background: none; border: 0; padding: 0; display: flex; align-items: center; gap: 8px;
 }
-.logo svg { width: 22px; height: 22px; }
-.sonda { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
-.sonda .m { font-size: 20px; font-weight: 600; }
-.sonda .strefa { font-size: 12px; color: var(--ink-dim); letter-spacing: 0.04em; }
-.skala { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
-.skala .wypelnienie { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--glow), var(--krill)); transition: width 1s cubic-bezier(.2,.8,.2,1); }
-.skala .znacznik { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.25); }
+.logo svg { width: 24px; height: 24px; }
+.sonda { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; padding-right: 6px; }
+.sonda .m { font-size: 17px; font-weight: 600; line-height: 1.2; }
+.sonda .strefa { font-size: 11px; color: var(--ink-dim); letter-spacing: 0.04em; }
+.skala { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; margin-inline: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
+.skala .wypelnienie { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--glow), var(--krill)); box-shadow: 0 0 10px var(--glow); }
+.skala .znacznik { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.3); }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  padding: 20px;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
+.panel { border-radius: var(--r); padding: 22px; }
 
 /* Menu */
-.bohater { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; }
+.bohater { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; }
 .bohater h1 {
   margin: 0; font-family: var(--f-display); font-weight: 800;
   font-size: clamp(44px, 13vw, 84px); line-height: 0.95; letter-spacing: -0.02em;
-  text-wrap: balance;
+  text-wrap: balance; text-shadow: 0 6px 30px rgba(0, 30, 60, 0.35);
 }
 .bohater h1 span { color: var(--krill); }
 .bohater p { margin: 0; color: var(--ink-dim); max-width: 46ch; font-size: 17px; }
 .tryby { display: grid; gap: 12px; }
 .tryb {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 14px;
-  text-align: left; padding: 18px 20px; border-radius: var(--r);
-  background: var(--panel); border: 1px solid var(--line);
-  transition: border-color .2s, transform .2s;
+  text-align: left; padding: 20px 22px; border-radius: var(--r);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
 }
-.tryb:hover { border-color: rgba(134,230,255,0.55); transform: translateY(-1px); }
-.tryb.glowny { background: linear-gradient(135deg, rgba(255,143,126,0.22), rgba(3,18,36,0.6)); border-color: rgba(255,143,126,0.5); }
+.tryb:hover { transform: translateY(-2px) scale(1.005); box-shadow: inset 0 1px 0 var(--szklo-blask), inset 0 0 28px rgba(255,255,255,0.08), 0 20px 50px var(--cien); }
+.tryb.glowny { background: linear-gradient(155deg, rgba(255,170,155,0.42) 0%, rgba(255,143,126,0.16) 50%, rgba(255,255,255,0.06) 100%); border-color: rgba(255,200,190,0.5); }
 .tryb .nazwa { font-family: var(--f-display); font-weight: 600; font-size: 18px; }
 .tryb .opis { grid-column: 1; color: var(--ink-dim); font-size: 14px; }
-.tryb .strzalka { grid-row: 1 / span 2; grid-column: 2; font-family: var(--f-mono); color: var(--glow); font-size: 14px; text-align: right; }
+.tryb .strzalka { grid-row: 1 / span 2; grid-column: 2; font-family: var(--f-mono); color: var(--ink); font-size: 13px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,0.14); box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
 .paczki { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .paczka {
-  text-align: left; padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.04);
-  border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px;
+  text-align: left; padding: 14px 16px; border-radius: var(--r-s);
+  display: flex; flex-direction: column; gap: 2px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 18px rgba(0,12,32,0.18);
+  transition: transform .2s, background .2s;
 }
-.paczka:hover { border-color: rgba(134,230,255,0.55); }
+.paczka:hover { transform: translateY(-2px); background: rgba(255,255,255,0.2); }
 .paczka b { font-weight: 700; }
 .paczka small { color: var(--ink-faint); font-family: var(--f-mono); font-size: 12px; }
 .statystyki { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -128,35 +165,40 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .meta { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-dim); font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; }
 .butle { display: flex; gap: 4px; }
 .butla { width: 10px; height: 18px; border-radius: 5px; border: 1.5px solid var(--glow); }
-.butla.pelna { background: var(--glow); }
+.butla.pelna { background: var(--glow); box-shadow: 0 0 8px var(--glow); }
 .pytanie {
   font-family: var(--f-display); font-weight: 600;
   font-size: clamp(28px, 7.5vw, 46px); line-height: 1.08; margin: 0; text-wrap: balance;
 }
 .pytanie .lit { color: var(--krill); }
 .podpowiedz { margin: 0; color: var(--ink-dim); font-size: 14px; }
-.zegar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
-.zegar div { height: 100%; width: 100%; background: var(--glow); transform-origin: left; }
-.zegar.koniec div { background: var(--krill); }
-.sekundy { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 13px; text-align: right; }
+.zegar { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.12); overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.25); }
+.zegar div { height: 100%; width: 100%; border-radius: 5px; background: linear-gradient(90deg, #c9f5ff, var(--glow)); box-shadow: 0 0 12px var(--glow); transform-origin: left; }
+.zegar.koniec div { background: linear-gradient(90deg, var(--krill-hi), var(--krill)); box-shadow: 0 0 12px var(--krill); }
+.sekundy { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 13px; text-align: right; margin-top: 4px; }
 form.wpis { display: flex; gap: 8px; }
 form.wpis input {
   flex: 1; min-width: 0; font: 600 22px/1.2 var(--f-body); color: var(--ink);
-  background: rgba(0,0,0,0.25); border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  border-radius: var(--r-s); padding: 15px 18px;
+  background: rgba(255,255,255,0.08);
+  box-shadow: inset 0 2px 8px rgba(0,10,30,0.25), inset 0 -1px 0 rgba(255,255,255,0.25);
 }
 form.wpis input::placeholder { color: var(--ink-faint); font-weight: 500; }
-form.wpis input:focus { border-color: var(--glow); outline: none; }
+form.wpis input:focus { border-color: rgba(143,233,255,0.8); outline: none; box-shadow: inset 0 2px 8px rgba(0,10,30,0.25), 0 0 0 4px rgba(143,233,255,0.18); }
 .przycisk {
-  border: 0; border-radius: 12px; padding: 14px 20px; font-weight: 700;
-  background: var(--krill); color: #2a0b07;
+  border: 1px solid rgba(255,220,212,0.7); border-radius: 999px; padding: 14px 24px; font-weight: 700;
+  background: linear-gradient(180deg, #ffb6a9 0%, var(--krill) 55%, #f57a67 100%);
+  color: #3a0f08;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 6px rgba(160,40,20,0.25), 0 10px 26px rgba(255,120,100,0.35);
+  transition: transform .15s, box-shadow .2s;
 }
-.przycisk:hover { background: #ffa596; }
-.przycisk.drugi { background: rgba(255,255,255,0.08); color: var(--ink); border: 1px solid var(--line); }
-.przycisk.drugi:hover { background: rgba(255,255,255,0.14); }
+.przycisk:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 14px 32px rgba(255,120,100,0.45); }
+.przycisk:active { transform: translateY(1px) scale(0.98); }
+.przycisk.drugi { color: var(--ink); border-radius: 999px; }
 .rzad { display: flex; gap: 10px; flex-wrap: wrap; }
 .komunikat { min-height: 24px; font-size: 15px; color: var(--ink-dim); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .komunikat.zly { color: var(--bad); }
-.komunikat .przycisk { padding: 8px 12px; font-size: 14px; }
+.komunikat .przycisk { padding: 8px 14px; font-size: 14px; }
 .potrzasnij { animation: potrzasnij .35s; }
 @keyframes potrzasnij { 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
 .proby { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -167,7 +209,9 @@ form.wpis input:focus { border-color: var(--glow); outline: none; }
 .wynik .slowo { font-family: var(--f-display); font-weight: 800; font-size: clamp(30px, 8vw, 52px); line-height: 1; margin: 0; overflow-wrap: anywhere; }
 .wynik .punkty { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wynik .punkty b { font-family: var(--f-mono); font-size: 34px; color: var(--krill); font-variant-numeric: tabular-nums; }
-.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid currentColor; }
+.wejscie { animation: wejscie .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes wejscie { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.chip { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid currentColor; background: rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3); }
 .chip.t0 { color: var(--ink-faint); }
 .chip.t1 { color: var(--t1); } .chip.t2 { color: var(--t2); } .chip.t3 { color: var(--t3); } .chip.t4 { color: var(--t4); } .chip.t5 { color: var(--t5); }
 .popularnosc { color: var(--ink-dim); font-size: 14px; }
@@ -183,7 +227,7 @@ form.wpis input:focus { border-color: var(--glow); outline: none; }
 .tabela td:first-child { color: var(--ink-faint); width: 44%; padding-right: 12px; }
 .tabela td:last-child { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 12px; }
 .tabela .w { font-weight: 700; overflow-wrap: anywhere; }
-.udostepnij { font-family: var(--f-mono); font-size: 13px; white-space: pre-wrap; background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px; margin: 0; user-select: all; }
+.udostepnij { font-family: var(--f-mono); font-size: 13px; white-space: pre-wrap; background: rgba(0,10,30,0.22); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin: 0; user-select: all; }
 
 /* Okno zasad */
 .zasady ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--ink-dim); }
@@ -192,17 +236,63 @@ form.wpis input:focus { border-color: var(--glow); outline: none; }
 .strefy div { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
 .strefy span:first-child { font-family: var(--f-mono); color: var(--ink-faint); }
 
+/* Animacja nurkowania po dobrej odpowiedzi */
+.nurkowanie {
+  position: fixed; inset: 0; z-index: 20; overflow: hidden;
+  display: grid; place-items: center;
+  background: radial-gradient(80% 60% at 50% 45%, rgba(0,20,45,0.05), rgba(0,10,25,0.45));
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .35s ease;
+  cursor: pointer;
+}
+.nurkowanie.widoczne { opacity: 1; }
+.nurkowanie[hidden] { display: none; }
+.linijka { position: absolute; inset: 0; pointer-events: none; }
+.linijka .kreska {
+  position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); left: 55%;
+  height: 0; border-top: 1px solid rgba(255,255,255,0.35);
+  font-family: var(--f-mono); font-size: 12px; color: rgba(255,255,255,0.75);
+  display: flex; justify-content: flex-end;
+}
+.linijka .kreska span { transform: translateY(-120%); }
+.linijka .kreska.mala { left: 82%; border-top-color: rgba(255,255,255,0.18); }
+.linijka .kreska.strefa { left: 0; border-top: 1px dashed rgba(143,233,255,0.6); color: var(--glow); }
+.linijka .kreska.strefa { justify-content: flex-start; }
+.linijka .kreska.strefa span { transform: translateY(-120%); padding-left: max(18px, env(safe-area-inset-left, 0px)); text-transform: uppercase; letter-spacing: 0.08em; }
+.nurek { position: relative; width: min(46vw, 200px); filter: drop-shadow(0 10px 30px rgba(0,0,0,0.35)); will-change: transform; }
+.nurek svg { width: 100%; height: auto; display: block; }
+.babel { position: absolute; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.7); background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0.08) 45%, transparent 70%); pointer-events: none; animation: babel 1.6s ease-out forwards; }
+@keyframes babel { to { transform: translate(var(--dx), -42vh) scale(1.3); opacity: 0; } }
+.licznik {
+  position: absolute; left: 50%; bottom: max(9vh, calc(env(safe-area-inset-bottom, 0px) + 40px));
+  transform: translateX(-50%);
+  border-radius: 26px; padding: 16px 26px; text-align: center; min-width: min(80vw, 300px);
+}
+.licznik .m { font-family: var(--f-display); font-weight: 800; font-size: clamp(34px, 10vw, 54px); line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.licznik .pod { margin-top: 8px; display: flex; gap: 10px; justify-content: center; align-items: center; min-height: 26px; opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
+.licznik .pod.widoczne { opacity: 1; transform: none; }
+.licznik .pod b { font-family: var(--f-mono); color: var(--krill); font-size: 20px; }
+.licznik .strefaN { font-size: 12px; color: var(--ink-dim); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
+.pomin { position: absolute; top: max(16px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); font-size: 12px; color: var(--ink-faint); letter-spacing: 0.06em; text-transform: uppercase; }
+
 @media (max-width: 480px) {
   .statystyki { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   form.wpis { flex-direction: column; }
-  .panel { padding: 16px; }
+  .panel { padding: 18px; }
+  .linijka .kreska { left: 62%; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 </style>
 
-<canvas id="snieg" aria-hidden="true"></canvas>
+<div class="tlo" aria-hidden="true">
+  <div class="poswiata a"></div>
+  <div class="poswiata b"></div>
+  <div class="poswiata c"></div>
+  <div class="promienie"></div>
+  <canvas id="snieg"></canvas>
+</div>
 <div class="aplikacja">
   <header class="gora">
     <button class="logo" id="logo" type="button" aria-label="Wróć do menu">
@@ -216,6 +306,37 @@ form.wpis input:focus { border-color: var(--glow); outline: none; }
   </header>
   <div class="skala" id="skala"><div class="wypelnienie" id="skalaWyp"></div></div>
   <main id="ekran"></main>
+</div>
+
+<div class="nurkowanie" id="nurkowanie" hidden aria-hidden="true">
+  <div class="linijka" id="linijka"></div>
+  <div class="nurek" id="nurek">
+    <svg viewBox="0 0 200 120" aria-hidden="true">
+      <defs>
+        <linearGradient id="cialo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffc2b6"/>
+          <stop offset=".55" stop-color="#ff8f7e"/>
+          <stop offset="1" stop-color="#e5604e"/>
+        </linearGradient>
+      </defs>
+      <g stroke="#ff9c8c" stroke-width="3" stroke-linecap="round" fill="none">
+        <path d="M150 52 C175 30 190 22 198 20"/>
+        <path d="M150 56 C178 46 192 44 199 46"/>
+        <path d="M70 78 l-6 22"/><path d="M86 82 l-4 23"/><path d="M102 84 l-2 23"/><path d="M118 83 l1 22"/><path d="M133 79 l4 20"/>
+      </g>
+      <path d="M18 66 C30 40 70 28 112 30 C140 31 160 42 166 58 C150 60 140 70 136 80 C110 92 70 92 40 84 C30 82 22 76 18 66Z" fill="url(#cialo)"/>
+      <path d="M18 66 L4 52 L8 72 L2 86 L22 74Z" fill="#ff8f7e"/>
+      <g stroke="rgba(160,40,25,0.35)" stroke-width="2" fill="none"><path d="M48 38 C46 55 48 70 52 86"/><path d="M68 32 C66 52 68 72 72 90"/><path d="M90 30 C88 52 90 72 94 91"/><path d="M112 30 C110 50 112 72 116 90"/></g>
+      <path d="M40 44 C70 34 110 32 140 40" stroke="rgba(255,255,255,0.6)" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <circle cx="150" cy="50" r="7" fill="#0b2340"/><circle cx="152.5" cy="47.5" r="2.4" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="licznik" id="licznik">
+    <div class="m" id="licznikM">0 m</div>
+    <div class="strefaN" id="licznikStrefa"></div>
+    <div class="pod" id="licznikPod"></div>
+  </div>
+  <div class="pomin">Kliknij, aby pominąć</div>
 </div>
 
 <script src="dane/kategorie.js"></script>
